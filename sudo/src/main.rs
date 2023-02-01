@@ -1,7 +1,6 @@
-use sudo_system::{hostname, Group, Process, User};
 use clap::Parser;
 use sudo_cli::{Cli, SudoOptions};
-
+use sudo_system::{hostname, Group, Process, User};
 
 #[derive(Debug)]
 struct CustomError(String);
