@@ -1,5 +1,10 @@
 use sudo_system::{hostname, Group, Process, User};
+use clap::Parser;
+use sudo_cli::{Cli, SudoOptions};
 
+
+#[derive(Debug)]
+struct CustomError(String);
 fn main() {
     let hostname = hostname();
     let user = User::effective();
@@ -13,4 +18,7 @@ fn main() {
     println!("{:?}", group);
     println!("{:?}", real_group);
     println!("{:?}", process_info);
+    let args = Cli::parse();
+    let captured = SudoOptions::from(args.clone());
+    println!("captured: {:?}", captured);
 }

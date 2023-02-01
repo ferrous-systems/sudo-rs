@@ -1,4 +1,4 @@
-use clap::Parser;
+use clap::{Parser, ArgAction};
 use std::path::PathBuf;
 
 #[derive(Debug, Parser, Clone)]
@@ -15,7 +15,7 @@ use std::path::PathBuf;
     usage: sudo [-AbEHknPS] [-C num] [-D directory] [-g group] [-h host] [-p prompt] [-R directory] [-T timeout] [-u user] [VAR=value] [-i|-s] [<command>]
     usage: sudo -e [-AknS] [-C num] [-D directory] [-g group] [-h host] [-p prompt] [-R directory] [-T timeout] [-u user] file ...",
 )]
-struct Cli {
+pub struct Cli {
     #[arg(
         long,
         short = 'A',
@@ -273,6 +273,7 @@ impl From<Cli> for SudoOptions {
             command_timeout: command.command_timeout,
             other_user: command.other_user,
             user: command.user,
+            // version: command.version,
             validate: command.validate,
             help: is_help,
             host,
