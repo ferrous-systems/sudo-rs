@@ -1,5 +1,3 @@
-use clap::Parser;
-use sudo_cli::{Cli, SudoOptions};
 use sudo_system::{hostname, Group, Process, User};
 
 #[derive(Debug)]
@@ -17,7 +15,6 @@ fn main() {
     println!("{:?}", group);
     println!("{:?}", real_group);
     println!("{:?}", process_info);
-    let args = Cli::parse();
-    let captured = SudoOptions::from(args.clone());
+    let captured = sudo_cli::SudoOptions::parse();
     println!("captured: {:?}", captured);
 }

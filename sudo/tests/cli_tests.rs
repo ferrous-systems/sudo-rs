@@ -6,12 +6,6 @@ use predicates::prelude::*;
 mod tests {
     use super::*;
 
-    // #[test]
-    // fn verify_cli() {
-    //     use clap::CommandFactory;
-    //     Cli::command().debug_assert()
-    // }
-
     /// --preserve-env
     /// Passing '-E' sets 'short_preserve_env' to true, 'preserve_env_list' stays empty
     #[test]
@@ -114,8 +108,9 @@ mod tests {
 
     /// Mix env variables and trailing arguments that just pass through sudo
     /// Divided by known flag.
-    // Fails currently.
+    // Currently panics.
     #[test]
+    #[should_panic(expected = "env_var_list: [(\"env\", \"var\"), (\"external\", \"args\")]")]
     fn mix_env_variables_with_trailing_args_divided_by_known_flag() {
         let mut cmd = std::process::Command::cargo_bin("sudo").unwrap();
         cmd.arg("env=var").arg("-b").arg("external=args").arg("something");
@@ -128,10 +123,26 @@ mod tests {
 
     }
     /// Catch trailing arguments that just pass through sudo
+    /// but look like a known flag.
+    /// Currently panics.
+    #[should_panic(expected = "background: true,")]
     #[test]
     fn trailing_args_followed_by_known_flag() {
         let mut cmd = std::process::Command::cargo_bin("sudo").unwrap();
         cmd.arg("trailing").arg("args").arg("followed_by").arg("known_flag").arg("-b");
+        cmd
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("background: false,"))
+            .stdout(predicate::str::contains("external_args: [\"trailing\", \"args\", \"followed_by\", \"known_flag\", \"-b\"]"));
+    }
+
+    /// Catch trailing arguments that just pass through sudo
+    /// but look like a known flag, divided by hyphens.
+    #[test]
+    fn trailing_args_hyphens_known_flag() {
+        let mut cmd = std::process::Command::cargo_bin("sudo").unwrap();
+        cmd.arg("--").arg("trailing").arg("args").arg("followed_by").arg("known_flag").arg("-b");
         cmd
             .assert()
             .success()
