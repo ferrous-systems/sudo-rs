@@ -1,19 +1,19 @@
 use clap::Parser;
-use std::path::PathBuf;
+use std::{path::PathBuf, process::exit};
 
 #[derive(Debug, Parser, Clone)]
 #[clap(
     name = "sudo-rs",
     about = "sudo - execute a command as another user",
     version,
-    // disable_version_flag = true,
+    disable_version_flag = true,
     disable_help_flag = true,
     trailing_var_arg = true,
     override_usage = "usage: sudo -h | -K | -k | -V
     usage: sudo -v [-AknS] [-g group] [-h host] [-p prompt] [-u user]
     usage: sudo -l [-AknS] [-g group] [-h host] [-p prompt] [-U user] [-u user] [command]
     usage: sudo [-AbEHknPS] [-C num] [-D directory] [-g group] [-h host] [-p prompt] [-R directory] [-T timeout] [-u user] [VAR=value] [-i|-s] [<command>]
-    usage: sudo -e [-AknS] [-C num] [-D directory] [-g group] [-h host] [-p prompt] [-R directory] [-T timeout] [-u user] file ...",
+    usage: sudo -e [-AknS] [-C num] [-D directory] [-g group] [-h host] [-p prompt] [-R directory] [-T timeout] [-u user] file ..."
 )]
 struct Cli {
     #[arg(
@@ -152,8 +152,6 @@ struct Cli {
         help = "run command (or edit file) as specified user name or ID"
     )]
     user: Option<String>,
-    // #[arg(short = 'V', long = "version", help = "display version information and exit!", action = ArgAction::Version, conflicts_with("host"), conflicts_with("remove_timestamp"), conflicts_with("reset_timestamp"))]
-    // version: bool,
     #[arg(
         short = 'v',
         long,
@@ -161,10 +159,15 @@ struct Cli {
         action
     )]
     validate: bool,
+    #[arg(short = 'V', action = clap::ArgAction::Version, required = false)]
+    version: (),
     #[arg(short = 'h', value_name = "host", default_value = None, default_missing_value = "", require_equals = true, num_args = 0..=1)]
     host_or_help: Option<String>,
     #[arg(long, value_name = "host")]
     host: Option<String>,
+
+    #[arg(long)]
+    help: bool,
     // this is a hack to make help show up for `--`, which wouldn't be allowed as a flag in clap.
     // Ignore value of `stop_processing_args`.
     #[arg(long = " ", help = "stop processing command line arguments", action)]
@@ -185,15 +188,9 @@ pub struct SudoOptions {
     pub preserve_env_list: Vec<String>,
     // This is what OGsudo calls `-E, --preserve-env`
     pub preserve_env: bool,
-    // Only one of the -e, -h, -i, -K, -l, -s, -v or -V options may be specified
     pub edit: bool,
     pub group: Option<String>,
     pub set_home: bool,
-    // #[arg(long, help = "display help message and exit!", action = ArgAction::Help)]
-    // pub help: bool, // TO DO: help as well as host are supposed to have short 'h'???
-    // #[arg(short = 'h', long = "host", help = "run command on host (if supported by plugin)")]
-    // pub host: Option<String>,
-    // possible to do the same way as preserve_env
     pub login: bool,
     pub remove_timestamp: bool,
     pub reset_timestamp: bool,
@@ -207,13 +204,8 @@ pub struct SudoOptions {
     pub command_timeout: Option<String>,
     pub other_user: Option<String>,
     pub user: Option<String>,
-    // pub version: bool,
     pub validate: bool,
-    pub help: bool,
     pub host: Option<String>,
-    // this is a hack to make help show up for `--`, which wouldn't be allowed as a flag in clap.
-    // Ignore value of `stop_processing_args`.
-    // pub stop_processing_args: bool,
     // Arguments passed straight through, either seperated by -- or just trailing.
     pub external_args: Vec<String>,
     pub env_var_list: Vec<(String, String)>,
@@ -222,20 +214,17 @@ pub struct SudoOptions {
 impl From<Cli> for SudoOptions {
     fn from(command: Cli) -> Self {
         let is_help = command.host_or_help.as_deref() == Some("");
+
+        if is_help || command.help {
+            println!("{}", HELP_MSG);
+            exit(0);
+        };
+
         let host = match command.host {
-            Some(host) => {
-                if !is_help {
-                    todo!("Both `-h=<HOST>` and `--help=<HOST>` are being used")
-                }
-                Some(host)
+            Some(_) => {
+                panic!("Both `-h=<HOST>` and `--help=<HOST>` are being used")
             }
-            None => {
-                if !is_help {
-                    command.host_or_help
-                } else {
-                    None
-                }
-            }
+            None => command.host_or_help,
         };
 
         // This lets us know if the user passed `--preserve-env` with no args
@@ -274,7 +263,6 @@ impl From<Cli> for SudoOptions {
             other_user: command.other_user,
             user: command.user,
             validate: command.validate,
-            help: is_help,
             host,
             external_args: command.external_args,
             env_var_list: Default::default(),
@@ -321,3 +309,45 @@ fn verify_cli() {
     use clap::CommandFactory;
     Cli::command().debug_assert()
 }
+
+const HELP_MSG: &str = "sudo - execute a command as another user
+
+usage: sudo -h | -K | -k | -V
+usage: sudo -v [-ABkNnS] [-g group] [-h host] [-p prompt] [-u user]
+usage: sudo -l [-ABkNnS] [-g group] [-h host] [-p prompt] [-U user] [-u user] [command]
+usage: sudo [-ABbEHkNnPS] [-C num] [-D directory] [-g group] [-h host] [-p prompt] [-R
+            directory] [-T timeout] [-u user] [VAR=value] [-i|-s] [<command>]
+usage: sudo -e [-ABkNnS] [-C num] [-D directory] [-g group] [-h host] [-p prompt] [-R
+            directory] [-T timeout] [-u user] file ...
+
+Options:
+  -A, --askpass                 use a helper program for password prompting
+  -b, --background              run command in the background
+  -B, --bell                    ring bell when prompting
+  -C, --close-from=num          close all file descriptors >= num
+  -D, --chdir=directory         change the working directory before running command
+  -E, --preserve-env            preserve user environment when running command
+      --preserve-env=list       preserve specific environment variables
+  -e, --edit                    edit files instead of running a command
+  -g, --group=group             run command as the specified group name or ID
+  -H, --set-home                set HOME variable to target user's home dir
+  -h, --help                    display help message and exit
+  -h, --host=host               run command on host (if supported by plugin)
+  -i, --login                   run login shell as the target user; a command may also be
+                                specified
+  -K, --remove-timestamp        remove timestamp file completely
+  -k, --reset-timestamp         invalidate timestamp file
+  -l, --list                    list user's privileges or check a specific command; use twice
+                                for longer format
+  -n, --non-interactive         non-interactive mode, no prompts are used
+  -P, --preserve-groups         preserve group vector instead of setting to target's
+  -p, --prompt=prompt           use the specified password prompt
+  -R, --chroot=directory        change the root directory before running command
+  -S, --stdin                   read password from standard input
+  -s, --shell                   run shell as the target user; a command may also be specified
+  -T, --command-timeout=timeout terminate command after the specified time limit
+  -U, --other-user=user         in list mode, display privileges for user
+  -u, --user=user               run command (or edit file) as specified user name or ID
+  -V, --version                 display version information and exit
+  -v, --validate                update user's timestamp without running a command
+  --                            stop processing command line arguments";
