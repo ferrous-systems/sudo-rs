@@ -9,7 +9,3 @@ sudo-common = { path = "../lib/sudo-common" }
 sudo-system = { path = "../lib/sudo-system" }
 sudo-cli = { path = "../lib/sudo-cli" }
 sudoers = { path = "../lib/sudoers" }
-
-[dev-dependencies]
-assert_cmd = "2.0.8"
-predicates = "2.1.5"

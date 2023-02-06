@@ -1,7 +1,7 @@
 use clap::Parser;
 use std::{path::PathBuf, process::exit};
 
-#[derive(Debug, Parser, Clone)]
+#[derive(Debug, Parser, Clone, PartialEq)]
 #[clap(
     name = "sudo-rs",
     about = "sudo - execute a command as another user",
@@ -177,7 +177,7 @@ struct Cli {
     external_args: Vec<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct SudoOptions {
     pub askpass: bool,
     pub background: bool,
