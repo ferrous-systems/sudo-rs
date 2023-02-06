@@ -1,5 +1,47 @@
-use clap::Parser;
+use clap::{error::Error, Parser};
 use std::{path::PathBuf, process::exit};
+
+const HELP_MSG: &str = "sudo - execute a command as another user
+
+usage: sudo -h | -K | -k | -V
+usage: sudo -v [-ABkNnS] [-g group] [-h host] [-p prompt] [-u user]
+usage: sudo -l [-ABkNnS] [-g group] [-h host] [-p prompt] [-U user] [-u user] [command]
+usage: sudo [-ABbEHkNnPS] [-C num] [-D directory] [-g group] [-h host] [-p prompt] [-R
+            directory] [-T timeout] [-u user] [VAR=value] [-i|-s] [<command>]
+usage: sudo -e [-ABkNnS] [-C num] [-D directory] [-g group] [-h host] [-p prompt] [-R
+            directory] [-T timeout] [-u user] file ...
+
+Options:
+  -A, --askpass                 use a helper program for password prompting
+  -b, --background              run command in the background
+  -B, --bell                    ring bell when prompting
+  -C, --close-from=num          close all file descriptors >= num
+  -D, --chdir=directory         change the working directory before running command
+  -E, --preserve-env            preserve user environment when running command
+      --preserve-env=list       preserve specific environment variables
+  -e, --edit                    edit files instead of running a command
+  -g, --group=group             run command as the specified group name or ID
+  -H, --set-home                set HOME variable to target user's home dir
+  -h, --help                    display help message and exit
+  -h, --host=host               run command on host (if supported by plugin)
+  -i, --login                   run login shell as the target user; a command may also be
+                                specified
+  -K, --remove-timestamp        remove timestamp file completely
+  -k, --reset-timestamp         invalidate timestamp file
+  -l, --list                    list user's privileges or check a specific command; use twice
+                                for longer format
+  -n, --non-interactive         non-interactive mode, no prompts are used
+  -P, --preserve-groups         preserve group vector instead of setting to target's
+  -p, --prompt=prompt           use the specified password prompt
+  -R, --chroot=directory        change the root directory before running command
+  -S, --stdin                   read password from standard input
+  -s, --shell                   run shell as the target user; a command may also be specified
+  -T, --command-timeout=timeout terminate command after the specified time limit
+  -U, --other-user=user         in list mode, display privileges for user
+  -u, --user=user               run command (or edit file) as specified user name or ID
+  -V, --version                 display version information and exit
+  -v, --validate                update user's timestamp without running a command
+  --                            stop processing command line arguments";
 
 #[derive(Debug, Parser, Clone, PartialEq)]
 #[clap(
@@ -211,8 +253,10 @@ pub struct SudoOptions {
     pub env_var_list: Vec<(String, String)>,
 }
 
-impl From<Cli> for SudoOptions {
-    fn from(command: Cli) -> Self {
+impl TryFrom<Cli> for SudoOptions {
+    type Error = Error;
+
+    fn try_from(command: Cli) -> Result<Self, Self::Error> {
         let is_help = command.host_or_help.as_deref() == Some("");
 
         if is_help || command.help {
@@ -220,17 +264,19 @@ impl From<Cli> for SudoOptions {
             exit(0);
         };
 
-        let host = match command.host {
-            Some(_) => {
-                panic!("Both `-h=<HOST>` and `--help=<HOST>` are being used")
-            }
-            None => command.host_or_help,
+        let host = if command.host.is_some() {
+            return Err(Error::raw(
+                clap::error::ErrorKind::ArgumentConflict,
+                "Cannot use `-h=<HOST>` and `--help=<HOST>` at the same time",
+            ));
+        } else {
+            command.host_or_help
         };
 
         // This lets us know if the user passed `--preserve-env` with no args
         let preserve_env_no_args = command.preserve_env.iter().any(String::is_empty);
 
-        Self {
+        Ok(Self {
             preserve_env: command.short_preserve_env || preserve_env_no_args,
             preserve_env_list: {
                 // Filter any empty item from the list as this means that the user passed
@@ -266,22 +312,28 @@ impl From<Cli> for SudoOptions {
             host,
             external_args: command.external_args,
             env_var_list: Default::default(),
-        }
+        })
     }
 }
 
 impl SudoOptions {
-    pub fn parse_from_args(mut args: impl Iterator<Item = String>) -> Self {
+    pub fn try_parse_from<I, T>(iter: I) -> Result<Self, Error>
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<String> + Clone,
+    {
+        let mut args = iter.into_iter();
+
         let mut env_var_list = Vec::new();
         let mut remaining_args = Vec::new();
 
         while let Some(arg) = args.next() {
-            dbg!(&arg);
+            let arg = arg.into();
             // If we found `--` we know that the remaining arguments are not env variable
             // definitions.
             if arg == "--" {
                 remaining_args.push(arg);
-                remaining_args.extend(args);
+                remaining_args.extend(args.map(Into::into));
                 break;
             }
 
@@ -296,64 +348,28 @@ impl SudoOptions {
             }
         }
 
-        let mut opts: SudoOptions = Cli::try_parse_from(remaining_args)
-            .unwrap_or_else(|err| panic!("{}", err))
-            .into();
+        let mut opts: SudoOptions = Cli::try_parse_from(remaining_args)?.try_into()?;
         opts.env_var_list = env_var_list;
 
-        opts
+        Ok(opts)
     }
 
-    #[inline]
     pub fn parse() -> Self {
-        Self::parse_from_args(std::env::args())
+        match Self::try_parse_from(std::env::args()) {
+            Ok(options) => options,
+            Err(err) => {
+                eprintln!("{}", err);
+                exit(1);
+            }
+        }
     }
 }
 
-#[test]
-fn verify_cli() {
-    use clap::CommandFactory;
-    Cli::command().debug_assert()
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn verify_cli() {
+        use clap::CommandFactory;
+        super::Cli::command().debug_assert()
+    }
 }
-
-const HELP_MSG: &str = "sudo - execute a command as another user
-
-usage: sudo -h | -K | -k | -V
-usage: sudo -v [-ABkNnS] [-g group] [-h host] [-p prompt] [-u user]
-usage: sudo -l [-ABkNnS] [-g group] [-h host] [-p prompt] [-U user] [-u user] [command]
-usage: sudo [-ABbEHkNnPS] [-C num] [-D directory] [-g group] [-h host] [-p prompt] [-R
-            directory] [-T timeout] [-u user] [VAR=value] [-i|-s] [<command>]
-usage: sudo -e [-ABkNnS] [-C num] [-D directory] [-g group] [-h host] [-p prompt] [-R
-            directory] [-T timeout] [-u user] file ...
-
-Options:
-  -A, --askpass                 use a helper program for password prompting
-  -b, --background              run command in the background
-  -B, --bell                    ring bell when prompting
-  -C, --close-from=num          close all file descriptors >= num
-  -D, --chdir=directory         change the working directory before running command
-  -E, --preserve-env            preserve user environment when running command
-      --preserve-env=list       preserve specific environment variables
-  -e, --edit                    edit files instead of running a command
-  -g, --group=group             run command as the specified group name or ID
-  -H, --set-home                set HOME variable to target user's home dir
-  -h, --help                    display help message and exit
-  -h, --host=host               run command on host (if supported by plugin)
-  -i, --login                   run login shell as the target user; a command may also be
-                                specified
-  -K, --remove-timestamp        remove timestamp file completely
-  -k, --reset-timestamp         invalidate timestamp file
-  -l, --list                    list user's privileges or check a specific command; use twice
-                                for longer format
-  -n, --non-interactive         non-interactive mode, no prompts are used
-  -P, --preserve-groups         preserve group vector instead of setting to target's
-  -p, --prompt=prompt           use the specified password prompt
-  -R, --chroot=directory        change the root directory before running command
-  -S, --stdin                   read password from standard input
-  -s, --shell                   run shell as the target user; a command may also be specified
-  -T, --command-timeout=timeout terminate command after the specified time limit
-  -U, --other-user=user         in list mode, display privileges for user
-  -u, --user=user               run command (or edit file) as specified user name or ID
-  -V, --version                 display version information and exit
-  -v, --validate                update user's timestamp without running a command
-  --                            stop processing command line arguments";

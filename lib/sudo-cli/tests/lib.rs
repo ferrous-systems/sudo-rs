@@ -5,7 +5,7 @@ use sudo_cli::SudoOptions;
 /// Passing '-E' sets 'short_preserve_env' to true, 'preserve_env_list' stays empty
 #[test]
 fn short_preserve_env() {
-    let cmd = SudoOptions::parse_from_args(["sudo", "-E"].into_iter().map(String::from));
+    let cmd = SudoOptions::try_parse_from(["sudo", "-E"]).unwrap();
     assert!(cmd.preserve_env);
     assert!(cmd.preserve_env_list.is_empty());
 }
@@ -13,8 +13,7 @@ fn short_preserve_env() {
 /// Passing '--preserve-env' sets 'short_preserve_env' to true, 'preserve_env_list' stays empty
 #[test]
 fn preserve_env_witout_var() {
-    let cmd =
-        SudoOptions::parse_from_args(["sudo", "--preserve-env"].into_iter().map(String::from));
+    let cmd = SudoOptions::try_parse_from(["sudo", "--preserve-env"]).unwrap();
     assert!(cmd.preserve_env);
     assert!(cmd.preserve_env_list.is_empty());
 }
@@ -23,17 +22,13 @@ fn preserve_env_witout_var() {
 #[test]
 #[should_panic]
 fn short_preserve_env_with_var_fails() {
-    SudoOptions::parse_from_args(["sudo", "-E=variable"].into_iter().map(String::from));
+    SudoOptions::try_parse_from(["sudo", "-E=variable"]).unwrap();
 }
 
 /// Passing '--preserve-env' with an argument fills 'preserve_env_list', 'short_preserve_env' stays 'false'
 #[test]
 fn preserve_env_with_var() {
-    let cmd = SudoOptions::parse_from_args(
-        ["sudo", "--preserve-env=some_argument"]
-            .into_iter()
-            .map(String::from),
-    );
+    let cmd = SudoOptions::try_parse_from(["sudo", "--preserve-env=some_argument"]).unwrap();
     assert_eq!(cmd.preserve_env_list, vec!["some_argument"]);
     assert!(!cmd.preserve_env);
 }
@@ -41,14 +36,11 @@ fn preserve_env_with_var() {
 /// Passing '--preserve-env' with several arguments fills 'preserve_env_list', 'short_preserve_env' stays 'false'
 #[test]
 fn preserve_env_with_several_vars() {
-    let cmd = SudoOptions::parse_from_args(
-        [
-            "sudo",
-            "--preserve-env=some_argument,another_argument,a_third_one",
-        ]
-        .into_iter()
-        .map(String::from),
-    );
+    let cmd = SudoOptions::try_parse_from([
+        "sudo",
+        "--preserve-env=some_argument,another_argument,a_third_one",
+    ])
+    .unwrap();
     assert_eq!(
         cmd.preserve_env_list,
         vec!["some_argument", "another_argument", "a_third_one"]
@@ -60,8 +52,7 @@ fn preserve_env_with_several_vars() {
 /// external_args stay empty.
 #[test]
 fn env_variable() {
-    let cmd =
-        SudoOptions::parse_from_args(["sudo", "ENV=with_a_value"].into_iter().map(String::from));
+    let cmd = SudoOptions::try_parse_from(["sudo", "ENV=with_a_value"]).unwrap();
     assert_eq!(
         cmd.env_var_list,
         vec![("ENV".to_owned(), "with_a_value".to_owned())]
@@ -73,16 +64,13 @@ fn env_variable() {
 /// external_args stay empty.
 #[test]
 fn several_env_variables() {
-    let cmd = SudoOptions::parse_from_args(
-        [
-            "sudo",
-            "ENV=with_a_value",
-            "another_var=otherval",
-            "more=this_is_a_val",
-        ]
-        .into_iter()
-        .map(String::from),
-    );
+    let cmd = SudoOptions::try_parse_from([
+        "sudo",
+        "ENV=with_a_value",
+        "another_var=otherval",
+        "more=this_is_a_val",
+    ])
+    .unwrap();
     assert_eq!(
         cmd.env_var_list,
         vec![
@@ -98,11 +86,8 @@ fn several_env_variables() {
 /// Divided by hyphens.
 #[test]
 fn mix_env_variables_with_trailing_args_divided_by_hyphens() {
-    let cmd = SudoOptions::parse_from_args(
-        ["sudo", "env=var", "--", "external=args", "something"]
-            .into_iter()
-            .map(String::from),
-    );
+    let cmd = SudoOptions::try_parse_from(["sudo", "env=var", "--", "external=args", "something"])
+        .unwrap();
     assert_eq!(cmd.env_var_list, vec![("env".to_owned(), "var".to_owned())]);
     assert_eq!(cmd.external_args, vec!["external=args", "something"]);
 }
@@ -112,11 +97,7 @@ fn mix_env_variables_with_trailing_args_divided_by_hyphens() {
 // Currently panics.
 #[test]
 fn mix_env_variables_with_trailing_args_divided_by_known_flag() {
-    let cmd = SudoOptions::parse_from_args(
-        ["sudo", "-b", "external=args", "something"]
-            .into_iter()
-            .map(String::from),
-    );
+    let cmd = SudoOptions::try_parse_from(["sudo", "-b", "external=args", "something"]).unwrap();
     assert_eq!(
         cmd.env_var_list,
         vec![("external".to_owned(), "args".to_owned())]
@@ -129,11 +110,8 @@ fn mix_env_variables_with_trailing_args_divided_by_known_flag() {
 /// but look like a known flag.
 #[test]
 fn trailing_args_followed_by_known_flag() {
-    let cmd = SudoOptions::parse_from_args(
-        ["sudo", "args", "followed_by", "known_flag", "-b"]
-            .into_iter()
-            .map(String::from),
-    );
+    let cmd =
+        SudoOptions::try_parse_from(["sudo", "args", "followed_by", "known_flag", "-b"]).unwrap();
     assert!(!cmd.background);
     assert_eq!(
         cmd.external_args,
@@ -145,19 +123,16 @@ fn trailing_args_followed_by_known_flag() {
 /// but look like a known flag, divided by hyphens.
 #[test]
 fn trailing_args_hyphens_known_flag() {
-    let cmd = SudoOptions::parse_from_args(
-        [
-            "sudo",
-            "--",
-            "trailing",
-            "args",
-            "followed_by",
-            "known_flag",
-            "-b",
-        ]
-        .into_iter()
-        .map(String::from),
-    );
+    let cmd = SudoOptions::try_parse_from([
+        "sudo",
+        "--",
+        "trailing",
+        "args",
+        "followed_by",
+        "known_flag",
+        "-b",
+    ])
+    .unwrap();
     assert!(!cmd.background);
     assert_eq!(
         cmd.external_args,
@@ -169,9 +144,5 @@ fn trailing_args_hyphens_known_flag() {
 #[test]
 #[should_panic]
 fn remove_and_reset_timestamp_exclusion() {
-    SudoOptions::parse_from_args(
-        ["sudo", "--reset-timestamp", "--reboot-timestamp"]
-            .into_iter()
-            .map(String::from),
-    );
+    SudoOptions::try_parse_from(["sudo", "--reset-timestamp", "--reboot-timestamp"]).unwrap();
 }
