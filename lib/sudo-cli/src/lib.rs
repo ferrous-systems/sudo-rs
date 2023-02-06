@@ -216,7 +216,7 @@ impl From<Cli> for SudoOptions {
         let is_help = command.host_or_help.as_deref() == Some("");
 
         if is_help || command.help {
-            println!("{}", HELP_MSG);
+            println!("{HELP_MSG}");
             exit(0);
         };
 
