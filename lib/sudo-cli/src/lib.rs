@@ -276,6 +276,7 @@ impl SudoOptions {
         let mut remaining_args = Vec::new();
 
         while let Some(arg) = args.next() {
+            dbg!(&arg);
             // If we found `--` we know that the remaining arguments are not env variable
             // definitions.
             if arg == "--" {
@@ -295,7 +296,9 @@ impl SudoOptions {
             }
         }
 
-        let mut opts: SudoOptions = Cli::parse_from(remaining_args).into();
+        let mut opts: SudoOptions = Cli::try_parse_from(remaining_args)
+            .unwrap_or_else(|err| panic!("{}", err))
+            .into();
         opts.env_var_list = env_var_list;
 
         opts

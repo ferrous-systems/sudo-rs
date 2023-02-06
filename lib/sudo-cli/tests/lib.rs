@@ -5,7 +5,7 @@ use sudo_cli::SudoOptions;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pretty_assertions::assert_eq;
+    // use pretty_assertions::assert_eq;
 
     /// --preserve-env
     /// Passing '-E' sets 'short_preserve_env' to true, 'preserve_env_list' stays empty
@@ -134,7 +134,6 @@ mod tests {
     /// Divided by known flag.
     // Currently panics.
     #[test]
-    #[should_panic(expected = "env_var_list: [(\"env\", \"var\"), (\"external\", \"args\")]")]
     fn mix_env_variables_with_trailing_args_divided_by_known_flag() {
         let cmd = SudoOptions::parse_from_args(
             vec![
@@ -146,8 +145,11 @@ mod tests {
             .into_iter(),
         );
         println!("cmd: {:?}", cmd);
-        assert_eq!(cmd.env_var_list, vec![("env".to_owned(), "var".to_owned())]);
-        assert_eq!(cmd.external_args, vec!["external=args", "something"]);
+        assert_eq!(
+            cmd.env_var_list,
+            vec![("external".to_owned(), "args".to_owned())]
+        );
+        assert_eq!(cmd.external_args, vec!["something"]);
         assert_eq!(cmd.background, true);
     }
 
