@@ -271,11 +271,9 @@ impl From<Cli> for SudoOptions {
 }
 
 impl SudoOptions {
-    pub fn parse() -> Self {
+    pub fn parse_from_args(mut args: impl Iterator<Item = String>) -> Self {
         let mut env_var_list = Vec::new();
         let mut remaining_args = Vec::new();
-
-        let mut args = std::env::args();
 
         while let Some(arg) = args.next() {
             // If we found `--` we know that the remaining arguments are not env variable
@@ -301,6 +299,11 @@ impl SudoOptions {
         opts.env_var_list = env_var_list;
 
         opts
+    }
+
+    #[inline]
+    pub fn parse() -> Self {
+        Self::parse_from_args(std::env::args())
     }
 }
 
