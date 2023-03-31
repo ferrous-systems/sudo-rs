@@ -12,6 +12,7 @@ mod pam;
 mod pass_auth;
 mod perms;
 mod sudoers;
+mod flag_chdir;
 
 type Error = Box<dyn std::error::Error>;
 type Result<T> = core::result::Result<T, Error>;
